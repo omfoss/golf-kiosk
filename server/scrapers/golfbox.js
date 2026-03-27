@@ -35,6 +35,12 @@ const DEMO_NAMES = [
   'Siri Haugen',   'Rune Strand',   'Pål Viken',    'Ingrid Bakke',
   'Tore Johansen', 'Hilde Solberg', 'Morten Dahl',  'Kristin Olsen',
   'Erik Christensen', 'Anne M. Berg', 'Svein A. Haugen', 'Wenche Strand',
+  'Jan Erik Lund', 'Berit Holm',    'Stein Nilsen',  'Monica Aasen',
+  'Trond Johansen','Marit Solheim', 'Anders Berge',  'Camilla Foss',
+  'Thomas Vold',   'Linda Haug',    'Geir Svendsen', 'Silje Myhre',
+  'Oddvar Brekke', 'Nina Strøm',    'Håkon Lie',     'Grete Paulsen',
+  'Roar Dybdahl',  'Vibeke Elstad', 'Helge Aas',     'Turid Kolstad',
+  'Dag Hovland',   'Astrid Knutsen','Vidar Ruud',    'Solveig Hammer',
 ];
 
 function getDemoData(interval = 10) {

@@ -32,7 +32,7 @@
       // Ingen har startet ennå – vis bare kommende
       prev    = [];
       current = null;
-      upcoming = all.filter(t => t.status !== 'blocked').slice(0, 9);
+      upcoming = all.filter(t => t.status !== 'blocked').slice(0, 20);
     } else {
       prev    = slots.slice(Math.max(0, currentIdx - 3), currentIdx);
       current = slots[currentIdx];
@@ -40,7 +40,7 @@
       const afterTime = toMins(current.time);
       upcoming = all
         .filter(t => toMins(t.time) > afterTime)
-        .slice(0, 7);
+        .slice(0, 18);
     }
   }
 </script>
@@ -245,10 +245,10 @@
   /* ── Rad-base ── */
   .row {
     display: grid;
-    grid-template-columns: 110px 1fr 40px auto;
+    grid-template-columns: 90px 1fr 35px auto;
     align-items: center;
-    gap: 14px;
-    padding: 9px 18px;
+    gap: 10px;
+    padding: 6px 14px;
     border-radius: 8px;
     background: #243828;
     border: 1px solid #355a3a;
@@ -324,7 +324,7 @@
   }
 
   .row-now .time { color: #3ddc57; }
-  .row-past .time { font-size: 1.2rem; color: #a0c4a4; font-weight: 400; }
+  .row-past .time { font-size: 1.2rem; color: #d8e8db; font-weight: 400; }
 
   /* ── Spillere ── */
   .col-players {
@@ -342,7 +342,7 @@
     white-space: nowrap;
   }
 
-  .row-past .player { font-size: 1rem; color: #a0c4a4; }
+  .row-past .player { font-size: 1rem; color: #d8e8db; }
 
   .hcp {
     font-size: 0.75em;
@@ -363,7 +363,7 @@
   }
 
   .row-now .flight-count { color: #3ddc57; }
-  .row-past .flight-count { font-size: 1.1rem; color: #6a9a6e; }
+  .row-past .flight-count { font-size: 1.1rem; color: #c8dccb; }
 
   /* player-count fjernet – erstattet av flight-count i egen kolonne */
 

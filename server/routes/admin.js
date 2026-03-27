@@ -1,7 +1,10 @@
 const express = require('express');
 const router = express.Router();
 
-const { requireAuth, loginHandler, changePasswordHandler, loginLimiter } = require('../auth');
+const {
+  requireAuth, requireAdmin, loginHandler, loginLimiter,
+  listUsersHandler, createUserHandler, changePinHandler, deleteUserHandler,
+} = require('../auth');
 const {
   getContent, setContent,
   getAllScreens, getScreen, upsertScreen, deleteScreen,
@@ -17,8 +20,11 @@ router.post('/login', loginLimiter, loginHandler);
 // Alle ruter under /api/admin/* krever autentisering (JWT)
 router.use(requireAuth);
 
-// Endre passord (krever innlogging)
-router.post('/change-password', changePasswordHandler);
+// ── Brukeradministrasjon ──────────────────────────────────────────────
+router.get('/users', requireAdmin, listUsersHandler);
+router.post('/users', requireAdmin, createUserHandler);
+router.post('/users/change-pin', changePinHandler);
+router.delete('/users/:userId', requireAdmin, deleteUserHandler);
 
 // ── Skjermadministrasjon ───────────────────────────────────────────────
 router.get('/screens', (req, res) => {

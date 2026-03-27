@@ -8,46 +8,53 @@ const path = require('path');
 
 // ── Konfig ──────────────────────────────────────────────────────────────
 const JWT_SECRET = process.env.JWT_SECRET || 'golf-kiosk-secret-change-me';
-const JWT_EXPIRES = '24h';
+const JWT_EXPIRES = '30d'; // 30 dager – slipper å logge inn ofte
 const DATA_FILE = path.join(__dirname, '../golf-kiosk-data.json');
 
-// ── Passord-håndtering ──────────────────────────────────────────────────
-function getStoredHash() {
+// ── Bruker-håndtering ───────────────────────────────────────────────────
+function getUsers() {
   try {
     const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-    return data.adminPasswordHash || null;
+    return data.users || [];
   } catch {
-    return null;
+    return [];
   }
 }
 
-function setStoredHash(hash) {
+function saveUsers(users) {
   let data = {};
   try {
     data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
   } catch {}
-  data.adminPasswordHash = hash;
+  data.users = users;
   fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf8');
 }
 
-// Ved første oppstart: hash passordet fra .env og lagre det
-function ensurePasswordHashed() {
-  const existing = getStoredHash();
-  if (existing) return; // Allerede hashet
+// Opprett standardbruker ved første oppstart
+function ensureDefaultUser() {
+  const users = getUsers();
+  if (users.length > 0) return;
 
-  const plainPassword = process.env.ADMIN_PASSWORD || 'golfklubb2025';
-  const hash = bcrypt.hashSync(plainPassword, 12);
-  setStoredHash(hash);
-  console.log('[auth] Admin-passord hashet og lagret');
+  const defaultPin = process.env.ADMIN_PIN || '1234';
+  const hash = bcrypt.hashSync(defaultPin, 10);
+  saveUsers([
+    {
+      id: 'admin',
+      name: 'Administrator',
+      role: 'admin',
+      pinHash: hash,
+      createdAt: new Date().toISOString(),
+    },
+  ]);
+  console.log('[auth] Standardbruker opprettet (PIN: ' + defaultPin + ')');
 }
 
-// Kjør ved import
-ensurePasswordHashed();
+ensureDefaultUser();
 
 // ── Rate-limiting ───────────────────────────────────────────────────────
 const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutter
-  max: 10, // maks 10 forsøk per IP
+  windowMs: 15 * 60 * 1000,
+  max: 15,
   message: { error: 'For mange innloggingsforsøk. Prøv igjen om 15 minutter.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -55,9 +62,7 @@ const loginLimiter = rateLimit({
 
 // ── JWT-middleware ───────────────────────────────────────────────────────
 function requireAuth(req, res, next) {
-  // Sjekk Authorization: Bearer <token>
   const authHeader = req.headers.authorization;
-
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Autentisering påkrevd' });
   }
@@ -77,49 +82,131 @@ function requireAuth(req, res, next) {
 
 // ── Login-handler ───────────────────────────────────────────────────────
 async function loginHandler(req, res) {
-  const { password } = req.body;
-  if (!password) {
-    return res.status(400).json({ error: 'Passord mangler' });
+  const { username, pin } = req.body;
+  if (!username || !pin) {
+    return res.status(400).json({ error: 'Brukernavn og PIN mangler' });
   }
 
-  const hash = getStoredHash();
-  if (!hash) {
-    return res.status(500).json({ error: 'Ingen passordhash funnet. Sjekk serveroppsett.' });
+  const users = getUsers();
+  const user = users.find(u => u.name.toLowerCase() === username.toLowerCase() || u.id === username.toLowerCase());
+
+  if (!user) {
+    return res.status(403).json({ error: 'Feil brukernavn eller PIN' });
   }
 
-  const match = await bcrypt.compare(password, hash);
+  const match = await bcrypt.compare(pin, user.pinHash);
   if (!match) {
-    return res.status(403).json({ error: 'Feil passord' });
+    return res.status(403).json({ error: 'Feil brukernavn eller PIN' });
   }
 
-  const token = jwt.sign({ role: 'admin' }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
-  res.json({ ok: true, token });
+  const token = jwt.sign(
+    { id: user.id, name: user.name, role: user.role },
+    JWT_SECRET,
+    { expiresIn: JWT_EXPIRES }
+  );
+
+  res.json({ ok: true, token, user: { id: user.id, name: user.name, role: user.role } });
 }
 
-// ── Endre passord ───────────────────────────────────────────────────────
-async function changePasswordHandler(req, res) {
-  const { currentPassword, newPassword } = req.body;
-  if (!currentPassword || !newPassword) {
-    return res.status(400).json({ error: 'Mangler nåværende og nytt passord' });
+// ── Bruker-CRUD (kun admin) ─────────────────────────────────────────────
+function requireAdmin(req, res, next) {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Kun administratorer kan gjøre dette' });
   }
-  if (newPassword.length < 6) {
-    return res.status(400).json({ error: 'Nytt passord må være minst 6 tegn' });
+  next();
+}
+
+function listUsersHandler(req, res) {
+  const users = getUsers().map(u => ({
+    id: u.id,
+    name: u.name,
+    role: u.role,
+    createdAt: u.createdAt,
+  }));
+  res.json(users);
+}
+
+async function createUserHandler(req, res) {
+  const { name, pin, role } = req.body;
+  if (!name || !pin) {
+    return res.status(400).json({ error: 'Navn og PIN mangler' });
+  }
+  if (pin.length < 4 || pin.length > 8 || !/^\d+$/.test(pin)) {
+    return res.status(400).json({ error: 'PIN må være 4-8 siffer' });
   }
 
-  const hash = getStoredHash();
-  const match = await bcrypt.compare(currentPassword, hash);
-  if (!match) {
-    return res.status(403).json({ error: 'Feil nåværende passord' });
+  const users = getUsers();
+  const id = name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
+
+  if (users.find(u => u.id === id)) {
+    return res.status(409).json({ error: 'Brukernavn finnes allerede' });
   }
 
-  const newHash = bcrypt.hashSync(newPassword, 12);
-  setStoredHash(newHash);
-  res.json({ ok: true, message: 'Passord endret' });
+  const hash = bcrypt.hashSync(pin, 10);
+  users.push({
+    id,
+    name,
+    role: role || 'editor',
+    pinHash: hash,
+    createdAt: new Date().toISOString(),
+  });
+
+  saveUsers(users);
+  res.json({ ok: true, user: { id, name, role: role || 'editor' } });
+}
+
+async function changePinHandler(req, res) {
+  const { userId, currentPin, newPin } = req.body;
+
+  if (!newPin || newPin.length < 4 || newPin.length > 8 || !/^\d+$/.test(newPin)) {
+    return res.status(400).json({ error: 'Ny PIN må være 4-8 siffer' });
+  }
+
+  const users = getUsers();
+  const targetId = userId || req.user.id;
+  const user = users.find(u => u.id === targetId);
+
+  if (!user) {
+    return res.status(404).json({ error: 'Bruker ikke funnet' });
+  }
+
+  // Admin kan endre andres PIN uten gammelt passord
+  if (targetId !== req.user.id && req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Ikke tilgang' });
+  }
+
+  // Hvis du endrer din egen PIN, krev gammelt
+  if (targetId === req.user.id && currentPin) {
+    const match = await bcrypt.compare(currentPin, user.pinHash);
+    if (!match) {
+      return res.status(403).json({ error: 'Feil nåværende PIN' });
+    }
+  }
+
+  user.pinHash = bcrypt.hashSync(newPin, 10);
+  saveUsers(users);
+  res.json({ ok: true });
+}
+
+function deleteUserHandler(req, res) {
+  const { userId } = req.params;
+
+  if (userId === req.user.id) {
+    return res.status(400).json({ error: 'Du kan ikke slette deg selv' });
+  }
+
+  const users = getUsers().filter(u => u.id !== userId);
+  saveUsers(users);
+  res.json({ ok: true });
 }
 
 module.exports = {
   requireAuth,
+  requireAdmin,
   loginHandler,
-  changePasswordHandler,
   loginLimiter,
+  listUsersHandler,
+  createUserHandler,
+  changePinHandler,
+  deleteUserHandler,
 };

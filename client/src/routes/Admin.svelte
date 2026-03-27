@@ -3,21 +3,25 @@
   import { adminApi, api, getToken, clearToken } from '../lib/api.js';
 
   // ── Auth ─────────────────────────────────────────────────────────────
-  let password = '';
+  let username = '';
+  let pin = '';
   let isLoggedIn = false;
   let loginError = '';
   let loginLoading = false;
+  let currentUser = null;
 
   async function login() {
     loginLoading = true;
     loginError = '';
     try {
-      await adminApi.login(password);
+      const result = await adminApi.login(username, pin);
+      currentUser = result.user;
       isLoggedIn = true;
-      password = ''; // Ikke lagre passordet
+      username = '';
+      pin = '';
       await loadAll();
     } catch (err) {
-      loginError = err.message === 'SESSION_EXPIRED' ? 'Sesjonen utløp. Prøv igjen.' : 'Feil passord. Prøv igjen.';
+      loginError = err.message === 'SESSION_EXPIRED' ? 'Sesjonen utløp. Prøv igjen.' : 'Feil brukernavn eller PIN.';
     } finally {
       loginLoading = false;
     }
@@ -30,14 +34,70 @@
 
   // ── Tab-navigasjon ────────────────────────────────────────────────────
   let activeTab = 'course';
-  const tabs = [
+  $: tabs = [
     { id: 'course',        label: 'Banestatus' },
     { id: 'announcements', label: 'Informasjon' },
     { id: 'cafe',          label: 'Restaurant' },
     { id: 'golfbox',       label: 'Golfbox' },
     { id: 'images',        label: 'Bilder' },
     { id: 'screens',       label: 'Skjermer' },
+    ...(currentUser?.role === 'admin' ? [{ id: 'users', label: 'Brukere' }] : []),
   ];
+
+  // ── Brukere (admin-only) ────────────────────────────────────────────
+  let users = [];
+  let newUserName = '';
+  let newUserPin = '';
+  let newUserRole = 'editor';
+  let userSaveMsg = '';
+
+  async function loadUsers() {
+    try {
+      const res = await fetch('/api/admin/users', {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (res.ok) users = await res.json();
+    } catch {}
+  }
+
+  async function createUser() {
+    if (!newUserName || !newUserPin) return;
+    userSaveMsg = '';
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+        body: JSON.stringify({ name: newUserName, pin: newUserPin, role: newUserRole }),
+      });
+      const data = await res.json();
+      if (!res.ok) { userSaveMsg = data.error; return; }
+      newUserName = '';
+      newUserPin = '';
+      userSaveMsg = 'Bruker opprettet!';
+      await loadUsers();
+    } catch { userSaveMsg = 'Feil ved opprettelse'; }
+  }
+
+  async function deleteUser(userId) {
+    if (!confirm(`Slett bruker "${userId}"?`)) return;
+    await fetch(`/api/admin/users/${userId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+    await loadUsers();
+  }
+
+  async function resetPin(userId) {
+    const newPin = prompt(`Ny PIN for ${userId} (4-8 siffer):`);
+    if (!newPin) return;
+    const res = await fetch('/api/admin/users/change-pin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+      body: JSON.stringify({ userId, newPin }),
+    });
+    if (res.ok) alert('PIN endret!');
+    else alert('Feil: ' + (await res.json()).error);
+  }
 
   // ── Data ──────────────────────────────────────────────────────────────
   let courseStatus = { lastMow: '', stimp: '', greens: '', bunkers: '', notes: '', openStatus: 'open' };
@@ -75,6 +135,7 @@
     // Last Golfbox-status og credentials
     loadGolfboxCredentials();
     loadGolfboxStatus();
+    if (currentUser?.role === 'admin') loadUsers();
   }
 
   // Prøv gjenbruk av JWT-token fra session + last bildebibliotek
@@ -82,13 +143,16 @@
     loadImageLibrary();
     const token = getToken();
     if (token) {
-      // Test om token fortsatt er gyldig
       try {
-        await api.getAllScreens(); // Offentlig endepunkt, men vi sjekker også admin
+        // Dekod JWT for å hente brukerinfo (uten validering – serveren validerer)
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        currentUser = { id: payload.id, name: payload.name, role: payload.role };
+        await api.getAllScreens();
         isLoggedIn = true;
         await loadAll();
       } catch {
         clearToken();
+        currentUser = null;
       }
     }
   });
@@ -376,13 +440,17 @@
       <p class="login-sub">Kongsvingers Golfklubb</p>
       <form on:submit|preventDefault={login}>
         <label>
-          Passord
-          <input type="password" bind:value={password} placeholder="Skriv inn passord" autofocus />
+          Brukernavn
+          <input type="text" bind:value={username} placeholder="Ditt navn" autofocus />
+        </label>
+        <label>
+          PIN-kode
+          <input type="password" inputmode="numeric" pattern="[0-9]*" bind:value={pin} placeholder="4-8 siffer" maxlength="8" />
         </label>
         {#if loginError}
           <p class="error">{loginError}</p>
         {/if}
-        <button type="submit" disabled={loginLoading || !password}>
+        <button type="submit" disabled={loginLoading || !username || !pin}>
           {loginLoading ? 'Logger inn…' : 'Logg inn'}
         </button>
       </form>
@@ -403,6 +471,9 @@
           <a href="/display/restaurant" target="_blank" rel="noopener noreferrer">Restaurant →</a>
           <a href="/display/proshop"    target="_blank" rel="noopener noreferrer">Pro shop →</a>
         </div>
+        {#if currentUser}
+          <span class="user-badge">👤 {currentUser.name}</span>
+        {/if}
         <button class="btn-ghost" on:click={logout}>
           Logg ut
         </button>
@@ -426,14 +497,6 @@
           <div class="section">
             <h2>Banestatus</h2>
             <div class="form-grid">
-              <label>
-                Banestatus
-                <select bind:value={courseStatus.openStatus}>
-                  <option value="open">Åpen</option>
-                  <option value="limited">Begrenset</option>
-                  <option value="closed">Stengt</option>
-                </select>
-              </label>
               <label>
                 Siste klipp
                 <input type="text" bind:value={courseStatus.lastMow} placeholder="f.eks. i går" />
@@ -497,11 +560,31 @@
             </div>
           </div>
 
-        <!-- ── Kunngjøringer ── -->
+        <!-- ── Informasjon ── -->
         {:else if activeTab === 'announcements'}
           <div class="section">
-            <h2>Informasjon</h2>
-            <p class="help-text">Roterer automatisk hvert 8. sekund på skjermen. Velg «Person» for å vise portrettbilde og hilsen fra en ansatt.</p>
+            <h2>Banestatus</h2>
+            <div class="form-grid" style="margin-bottom: 1rem;">
+              <label>
+                Banestatus (vises øverst i informasjonsboksen)
+                <select bind:value={courseStatus.openStatus}>
+                  <option value="open">Åpen</option>
+                  <option value="limited">Begrenset</option>
+                  <option value="closed">Stengt</option>
+                </select>
+              </label>
+            </div>
+            <div class="action-row">
+              <button class="btn-primary" on:click={() => save('course_status', courseStatus)} disabled={saving}>
+                {saving ? 'Lagrer…' : 'Lagre'}
+              </button>
+              {#if saveMsg}<span class="save-msg">{saveMsg}</span>{/if}
+            </div>
+          </div>
+
+          <div class="section">
+            <h2>Kunngjøringer</h2>
+            <p class="help-text">Velg «Person» for å vise portrettbilde og hilsen fra en ansatt.</p>
             <div class="announcement-list">
               {#each announcements as ann}
                 <div class="ann-card">
@@ -928,6 +1011,73 @@
           </div>
         {/if}
 
+        <!-- ── BRUKERE ──────────────────────────────────────────────────── -->
+        {#if activeTab === 'users' && currentUser?.role === 'admin'}
+          <div class="tab-content">
+            <div class="card">
+              <h2>Brukere</h2>
+              <p class="help-text">Administrer hvem som har tilgang til admin-panelet.</p>
+
+              <table class="users-table">
+                <thead>
+                  <tr>
+                    <th>Navn</th>
+                    <th>Rolle</th>
+                    <th>Handlinger</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {#each users as user}
+                    <tr>
+                      <td><strong>{user.name}</strong> <span class="user-id">({user.id})</span></td>
+                      <td>
+                        <span class="role-badge" class:role-admin={user.role === 'admin'}>
+                          {user.role === 'admin' ? 'Administrator' : 'Redaktør'}
+                        </span>
+                      </td>
+                      <td>
+                        <button class="btn-small" on:click={() => resetPin(user.id)}>Endre PIN</button>
+                        {#if user.id !== currentUser.id}
+                          <button class="btn-small btn-danger" on:click={() => deleteUser(user.id)}>Slett</button>
+                        {/if}
+                      </td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+
+              <h3 style="margin-top: 2rem;">Legg til bruker</h3>
+              <div class="new-user-form">
+                <label>
+                  Navn
+                  <input type="text" bind:value={newUserName} placeholder="F.eks. Kari" />
+                </label>
+                <label>
+                  PIN-kode
+                  <input type="text" inputmode="numeric" pattern="[0-9]*" bind:value={newUserPin} placeholder="4-8 siffer" maxlength="8" />
+                </label>
+                <label>
+                  Rolle
+                  <select bind:value={newUserRole}>
+                    <option value="editor">Redaktør</option>
+                    <option value="admin">Administrator</option>
+                  </select>
+                </label>
+                <button class="btn-primary" on:click={createUser} disabled={!newUserName || !newUserPin}>
+                  Opprett bruker
+                </button>
+                {#if userSaveMsg}<span class="save-msg">{userSaveMsg}</span>{/if}
+              </div>
+
+              <div class="roles-info">
+                <h4>Roller</h4>
+                <p><strong>Administrator</strong> – full tilgang, kan opprette og slette brukere</p>
+                <p><strong>Redaktør</strong> – kan oppdatere innhold (banestatus, informasjon, meny)</p>
+              </div>
+            </div>
+          </div>
+        {/if}
+
       </div>
     </div>
   </div>
@@ -1220,6 +1370,34 @@
     border: 1px solid #c8d8c8;
   }
   .btn-ghost:hover { background: #f0f5f0; }
+
+  .user-badge {
+    font-size: 0.85rem;
+    color: #486747;
+    background: #f0f5f0;
+    padding: 0.3rem 0.7rem;
+    border-radius: 6px;
+  }
+
+  /* ── Brukertabell ── */
+  .users-table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+  .users-table th { text-align: left; padding: 0.5rem; border-bottom: 2px solid #e0e0e0; font-size: 0.85rem; color: #666; }
+  .users-table td { padding: 0.6rem 0.5rem; border-bottom: 1px solid #f0f0f0; }
+  .user-id { color: #999; font-size: 0.8rem; }
+  .role-badge { font-size: 0.8rem; padding: 0.2rem 0.5rem; border-radius: 4px; background: #e8f5e9; color: #2e7d32; }
+  .role-badge.role-admin { background: #fff3e0; color: #e65100; }
+  .btn-small { font-size: 0.8rem; padding: 0.3rem 0.6rem; border: 1px solid #ccc; border-radius: 4px; background: white; cursor: pointer; }
+  .btn-small:hover { background: #f5f5f5; }
+  .btn-danger { color: #c0392b; border-color: #e0b0b0; }
+  .btn-danger:hover { background: #fdf0f0; }
+
+  .new-user-form { display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; margin-top: 0.5rem; }
+  .new-user-form label { font-size: 0.85rem; }
+  .new-user-form input, .new-user-form select { width: 150px; }
+
+  .roles-info { margin-top: 1.5rem; padding: 1rem; background: #f8faf8; border-radius: 8px; }
+  .roles-info h4 { margin: 0 0 0.5rem; font-size: 0.9rem; }
+  .roles-info p { margin: 0.3rem 0; font-size: 0.85rem; color: #555; }
 
   .btn-remove {
     background: transparent;

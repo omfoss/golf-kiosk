@@ -94,19 +94,16 @@ export const api = {
 // ── Admin endpoints (JWT-beskyttet) ─────────────────────────────────────
 export const adminApi = {
   // Login – returnerer { ok, token }
-  login: async (password) => {
+  login: async (username, pin) => {
     const res = await fetch(`${BASE}/admin/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password }),
+      body: JSON.stringify({ username, pin }),
     });
     const data = await handleResponse(res);
     if (data.token) setToken(data.token);
     return data;
   },
-
-  changePassword: (currentPassword, newPassword) =>
-    authPost('/admin/change-password', { currentPassword, newPassword }),
 
   // Innhold
   updateContent:  (key, val) => authPut(`/admin/content/${key}`, val),

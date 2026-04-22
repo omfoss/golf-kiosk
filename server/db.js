@@ -31,7 +31,7 @@ const DEFAULTS = {
     {
       id: 'utebane',
       name: 'Utebane (18 hull)',
-      guid: '',
+      guid: 'AD716485-249A-4C67-863E-354C5F492140',
       interval: 10,
       isDemo: false,
       active: false,
@@ -66,6 +66,18 @@ const DEFAULTS = {
       courseId: 'sim1',
       layout: 'standard',
       modules: ['tee-times', 'course-status', 'announcements'],
+    },
+    {
+      id: 'utendors',
+      name: 'Utendørsskjerm (totem)',
+      courseId: 'utebane',
+      orientation: 'portrait',
+      layout: 'standard',
+      columns: [
+        ['tee-times'],
+        ['course-status', 'announcements'],
+        ['weather'],
+      ],
     },
   ],
   content: {

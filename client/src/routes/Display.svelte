@@ -15,13 +15,18 @@
 
   export let screenId = 'lobby';
 
-  // Automatisk skalering – designet for 1920x1080, skalerer opp/ned
+  // Automatisk skalering – designet for 1920x1080 (landskap) eller 1080x1920 (portrett)
   let scale = 1;
+  $: isPortrait = $screenConfig?.orientation === 'portrait';
+  $: canvasW = isPortrait ? 1080 : 1920;
+  $: canvasH = isPortrait ? 1920 : 1080;
   function updateScale() {
-    const scaleX = window.innerWidth / 1920;
-    const scaleY = window.innerHeight / 1080;
+    const scaleX = window.innerWidth / canvasW;
+    const scaleY = window.innerHeight / canvasH;
     scale = Math.min(scaleX, scaleY);
   }
+  // Re-scale når orientation endres (async config-last)
+  $: if (canvasW && canvasH) updateScale();
   onMount(() => {
     updateScale();
     window.addEventListener('resize', updateScale);
@@ -108,7 +113,7 @@
 </script>
 
 <div class="screen-wrapper" style="background:#1c2e20">
-<div class="screen" style="transform:scale({scale});transform-origin:top left;width:1920px;height:1080px">
+<div class="screen" class:portrait={isPortrait} style="transform:scale({scale});transform-origin:top left;width:{canvasW}px;height:{canvasH}px">
   <!-- ── Header ─────────────────────────────────────────────────────── -->
   <header>
     <div class="club-info">
@@ -167,14 +172,46 @@
   .screen {
     display: flex;
     flex-direction: column;
-    width: 1920px;
-    height: 1080px;
     background: #1c2e20;
     color: #f0f5f1;
     padding: 20px 36px 12px;
     gap: 12px;
     overflow: hidden;
     box-sizing: border-box;
+  }
+
+  /* ── Portrett-modus (1080x1920 utendørs-totem) ── */
+  .screen.portrait {
+    background: #0a1a0d;        /* mørkere for bedre kontrast i sollys */
+    padding: 28px 32px 20px;
+    gap: 20px;
+    font-size: 1.4rem;           /* skalerer opp alt relativ-størrelse */
+  }
+
+  .screen.portrait main {
+    flex-direction: column;       /* stable moduler vertikalt i stedet for horisontalt */
+    gap: 24px;
+  }
+
+  .screen.portrait .col {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* Første "kolonne" (tee-times) får mest plass i portrett */
+  .screen.portrait main > .col:nth-child(1) { flex: 5; }
+  .screen.portrait main > .col:nth-child(2) { flex: 3; }
+  .screen.portrait main > .col:nth-child(3) { flex: 2; }
+
+  .screen.portrait .club-name { font-size: 2.6rem; }
+  .screen.portrait .club-sub  { font-size: 1.05rem; }
+  .screen.portrait .clock     { font-size: 4rem; }
+  .screen.portrait .date      { font-size: 1.1rem; }
+  .screen.portrait .logo      { height: 80px; }
+
+  .screen.portrait :global(.section-label) {
+    font-size: 1.15rem !important;
+    color: #b8d8b8 !important;
   }
 
   /* ── Header ── */

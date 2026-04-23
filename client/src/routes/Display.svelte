@@ -198,10 +198,11 @@
     gap: 16px;
   }
 
-  /* Første "kolonne" (tee-times) får mest plass i portrett */
-  .screen.portrait main > .col:nth-child(1) { flex: 5; }
-  .screen.portrait main > .col:nth-child(2) { flex: 3; }
-  .screen.portrait main > .col:nth-child(3) { flex: 2; }
+  /* Portrett-rekkefølge: info → banestatus → tee-times (størst) → vær */
+  .screen.portrait main > .col:nth-child(1) { flex: 2; }  /* announcements */
+  .screen.portrait main > .col:nth-child(2) { flex: 2; }  /* course-status */
+  .screen.portrait main > .col:nth-child(3) { flex: 5; }  /* tee-times (hovedfokus) */
+  .screen.portrait main > .col:nth-child(4) { flex: 3; }  /* weather */
 
   .screen.portrait .club-name { font-size: 2.6rem; }
   .screen.portrait .club-sub  { font-size: 1.05rem; }

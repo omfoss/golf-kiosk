@@ -74,8 +74,9 @@ const DEFAULTS = {
       orientation: 'portrait',
       layout: 'standard',
       columns: [
+        ['announcements'],
+        ['course-status'],
         ['tee-times'],
-        ['course-status', 'announcements'],
         ['weather'],
       ],
     },

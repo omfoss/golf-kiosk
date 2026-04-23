@@ -163,7 +163,7 @@ async function fetchTeeTimes(course) {
 
   if (!cookie) {
     console.warn(`[golfbox] Ingen cookie tilgjengelig (${courseId}) – bruker mock-data`);
-    const result = { courseId, times: getMockData(), sessionExpired: false, isMock: true, noCredentials: true, fetchedAt: new Date().toISOString() };
+    const result = { courseId, times: getMockData(), sessionExpired: false, isMock: true, noCredentials: true, ...(previewDate ? { isPreview: true, previewDate } : {}), fetchedAt: new Date().toISOString() };
     caches.set(courseId, { data: result, fetchedAt: now });
     return result;
   }
@@ -198,7 +198,7 @@ async function fetchTeeTimes(course) {
       } catch (loginErr) {
         console.warn('[golfbox] Auto-login feilet:', loginErr.message);
       }
-      const result = { courseId, times: getMockData(), sessionExpired: true, isMock: true, fetchedAt: new Date().toISOString() };
+      const result = { courseId, times: getMockData(), sessionExpired: true, isMock: true, ...(previewDate ? { isPreview: true, previewDate } : {}), fetchedAt: new Date().toISOString() };
       caches.set(courseId, { data: result, fetchedAt: now });
       return result;
     }
@@ -265,7 +265,7 @@ async function fetchTeeTimes(course) {
 
     if (times.length === 0) {
       console.warn(`[golfbox] Ingen rader funnet (${courseId}) – bruker mock-data`);
-      const result = { courseId, times: getMockData(), sessionExpired: false, isMock: true, fetchedAt: new Date().toISOString() };
+      const result = { courseId, times: getMockData(), sessionExpired: false, isMock: true, ...(previewDate ? { isPreview: true, previewDate } : {}), fetchedAt: new Date().toISOString() };
       caches.set(courseId, { data: result, fetchedAt: now });
       return result;
     }
@@ -285,7 +285,7 @@ async function fetchTeeTimes(course) {
 
   } catch (err) {
     console.error(`[golfbox] Feil (${courseId}):`, err.message);
-    const result = { courseId, times: getMockData(), sessionExpired: false, isMock: true, fetchedAt: new Date().toISOString() };
+    const result = { courseId, times: getMockData(), sessionExpired: false, isMock: true, ...(previewDate ? { isPreview: true, previewDate } : {}), fetchedAt: new Date().toISOString() };
     caches.set(courseId, { data: result, fetchedAt: now });
     return result;
   }

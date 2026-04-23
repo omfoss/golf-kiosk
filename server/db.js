@@ -32,6 +32,7 @@ const DEFAULTS = {
       id: 'utebane',
       name: 'Utebane (18 hull)',
       guid: 'AD716485-249A-4C67-863E-354C5F492140',
+      openFrom: '2026-05-01',
       interval: 10,
       isDemo: false,
       active: false,

@@ -60,7 +60,17 @@
   </div>
 
   <div class="rows">
-    {#if prev.length === 0 && !current && upcoming.length === 0}
+    {#if $teetimes.notYetOpen}
+      {@const d = new Date($teetimes.opensAt + 'T00:00:00')}
+      {@const months = ['januar','februar','mars','april','mai','juni','juli','august','september','oktober','november','desember']}
+      <div class="season-closed">
+        <div class="season-icon">🌱</div>
+        <div class="season-title">Banen åpner</div>
+        <div class="season-date">{d.getDate()}. {months[d.getMonth()]}</div>
+        <div class="season-sub">Vi gleder oss til å se deg!</div>
+      </div>
+
+    {:else if prev.length === 0 && !current && upcoming.length === 0}
       <div class="empty">Ingen starttider</div>
 
     {:else}
@@ -232,6 +242,40 @@
     font-style: italic;
     margin-top: 40px;
     text-align: center;
+  }
+
+  .season-closed {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 40px 20px;
+    height: 100%;
+    text-align: center;
+  }
+  .season-icon {
+    font-size: 3.5rem;
+    line-height: 1;
+  }
+  .season-title {
+    font-family: 'EB Garamond', serif;
+    font-size: 1.8rem;
+    color: #b8d8b8;
+    letter-spacing: 0.02em;
+  }
+  .season-date {
+    font-family: 'EB Garamond', serif;
+    font-size: 3rem;
+    font-weight: 600;
+    color: #ffffff;
+    line-height: 1;
+  }
+  .season-sub {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1rem;
+    color: #8fb892;
+    margin-top: 8px;
   }
 
   /* ── Skillelinje ── */

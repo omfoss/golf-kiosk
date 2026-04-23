@@ -124,6 +124,22 @@ async function fetchTeeTimes(course) {
   const c = getCache(courseId);
   if (c.data && now - c.fetchedAt < CACHE_TTL) return c.data;
 
+  // Sesongstengt: banen er ikke åpnet ennå
+  if (course?.openFrom) {
+    const opens = new Date(course.openFrom + 'T00:00:00');
+    if (Date.now() < opens.getTime()) {
+      const result = {
+        courseId,
+        times: [],
+        notYetOpen: true,
+        opensAt: course.openFrom,
+        fetchedAt: new Date().toISOString(),
+      };
+      caches.set(courseId, { data: result, fetchedAt: now });
+      return result;
+    }
+  }
+
   // Demo-bane: generer syntetisk data
   if (isDemo) {
     const result = {

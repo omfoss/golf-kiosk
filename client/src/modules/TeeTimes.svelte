@@ -21,11 +21,13 @@
     // Non-blocked slots for prev/current-beregning
     const slots = all.filter(t => t.status !== 'blocked');
 
-    // Finn siste slot med tid <= nowMins (= "nåværende")
+    // Ved preview (fremtidig dato) er ingen "nåværende" — vis alt som upcoming
     let currentIdx = -1;
-    for (let i = 0; i < slots.length; i++) {
-      if (toMins(slots[i].time) <= nowMins) currentIdx = i;
-      else break;
+    if (!$teetimes.isPreview) {
+      for (let i = 0; i < slots.length; i++) {
+        if (toMins(slots[i].time) <= nowMins) currentIdx = i;
+        else break;
+      }
     }
 
     if (currentIdx < 0) {
@@ -50,6 +52,10 @@
     <span class="section-label">{$courseName ? `Starttider – ${$courseName}` : 'Starttider'}</span>
     {#if $teetimes.sessionExpired}
       <span class="badge badge-warn">Session utløpt</span>
+    {:else if $teetimes.isPreview}
+      {@const pd = new Date($teetimes.previewDate + 'T00:00:00')}
+      {@const months = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des']}
+      <span class="badge badge-preview">Åpning {pd.getDate()}. {months[pd.getMonth()]}</span>
     {:else if $teetimes.isDemo}
       <span class="badge badge-demo">● Demo</span>
     {:else if $teetimes.isMock}
@@ -60,17 +66,7 @@
   </div>
 
   <div class="rows">
-    {#if $teetimes.notYetOpen}
-      {@const d = new Date($teetimes.opensAt + 'T00:00:00')}
-      {@const months = ['januar','februar','mars','april','mai','juni','juli','august','september','oktober','november','desember']}
-      <div class="season-closed">
-        <div class="season-icon">🌱</div>
-        <div class="season-title">Banen åpner</div>
-        <div class="season-date">{d.getDate()}. {months[d.getMonth()]}</div>
-        <div class="season-sub">Vi gleder oss til å se deg!</div>
-      </div>
-
-    {:else if prev.length === 0 && !current && upcoming.length === 0}
+    {#if prev.length === 0 && !current && upcoming.length === 0}
       <div class="empty">Ingen starttider</div>
 
     {:else}
@@ -225,6 +221,7 @@
   .badge-mock  { background: #3d2e0a; color: #c9a84c; border: 1px solid #c9a84c60; }
   .badge-demo  { background: #1a2a3d; color: #7ab4e8; border: 1px solid #3a6a9a60; }
   .badge-warn  { background: #3d0a0a; color: #e05252; border: 1px solid #e0525260; }
+  .badge-preview { background: #2a3d1e; color: #b8e08a; border: 1px solid #7ab854; }
 
   /* ── Rows ── */
   .rows {

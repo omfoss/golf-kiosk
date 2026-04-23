@@ -124,19 +124,12 @@ async function fetchTeeTimes(course) {
   const c = getCache(courseId);
   if (c.data && now - c.fetchedAt < CACHE_TTL) return c.data;
 
-  // Sesongstengt: banen er ikke åpnet ennå
+  // Sesongstengt: før åpningsdato — forhåndsvis starttider FOR åpningsdagen
+  let previewDate = null;
   if (course?.openFrom) {
     const opens = new Date(course.openFrom + 'T00:00:00');
     if (Date.now() < opens.getTime()) {
-      const result = {
-        courseId,
-        times: [],
-        notYetOpen: true,
-        opensAt: course.openFrom,
-        fetchedAt: new Date().toISOString(),
-      };
-      caches.set(courseId, { data: result, fetchedAt: now });
-      return result;
+      previewDate = course.openFrom; // YYYY-MM-DD
     }
   }
 
@@ -175,8 +168,10 @@ async function fetchTeeTimes(course) {
     return result;
   }
 
+  // Golfbox SelectedDate-param: YYYYMMDD (uten bindestreker)
+  const dateParam = previewDate ? `&SelectedDate=${previewDate.replace(/-/g, '')}` : '';
   const url = `https://www.golfbox.no/site/my_golfbox/ressources/booking/grid.asp`
-    + `?Ressource_GUID=${courseGuid}&Club_GUID=${CLUB_GUID}`;
+    + `?Ressource_GUID=${courseGuid}&Club_GUID=${CLUB_GUID}${dateParam}`;
 
   try {
     const response = await axios.get(url, {
@@ -277,7 +272,14 @@ async function fetchTeeTimes(course) {
 
     times.sort((a, b) => a.time.localeCompare(b.time));
 
-    const result = { courseId, times, sessionExpired: false, isMock: false, fetchedAt: new Date().toISOString() };
+    const result = {
+      courseId,
+      times,
+      sessionExpired: false,
+      isMock: false,
+      ...(previewDate ? { isPreview: true, previewDate } : {}),
+      fetchedAt: new Date().toISOString(),
+    };
     caches.set(courseId, { data: result, fetchedAt: now });
     return result;
 

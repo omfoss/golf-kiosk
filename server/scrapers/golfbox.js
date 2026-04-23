@@ -168,8 +168,8 @@ async function fetchTeeTimes(course) {
     return result;
   }
 
-  // Golfbox SelectedDate-param: YYYYMMDD (uten bindestreker)
-  const dateParam = previewDate ? `&SelectedDate=${previewDate.replace(/-/g, '')}` : '';
+  // Golfbox SelectedDate-param: YYYYMMDDTHHMMSS (f.eks. 20260501T070000)
+  const dateParam = previewDate ? `&SelectedDate=${previewDate.replace(/-/g, '')}T070000` : '';
   const url = `https://www.golfbox.no/site/my_golfbox/ressources/booking/grid.asp`
     + `?Ressource_GUID=${courseGuid}&Club_GUID=${CLUB_GUID}${dateParam}`;
 
